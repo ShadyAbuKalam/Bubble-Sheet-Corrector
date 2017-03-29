@@ -47,3 +47,5 @@ fabric.properties
 *.zip
 test/
 test.png
+submission.csv
+.~*
