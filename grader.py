@@ -19,40 +19,50 @@ def optimize_image_rotation(image):
     edged = cv2.Canny(blurred, 75, 150)
 
     # find circles in the edge map, then find two almost on the same line
-    circles = cv2.HoughCircles(edged, cv2.HOUGH_GRADIENT, 3, 700, minRadius=35, maxRadius=45)[0]
+    dp_values = [2,3,4]
+    for dp in dp_values:
+        circles = cv2.HoughCircles(edged, cv2.HOUGH_GRADIENT, dp, 700, minRadius=35, maxRadius=45)
+        if circles is None:
+            continue
+        else:
+            circles = circles[0]
+        #
+        # for c in circles:
+        #     cv2.circle(image,(c[0],c[1]),c[2],(255,255,0),3)
+        # temp = image.copy()
+        # for c in circles:
+        #     cv2.circle(temp, (c[0], c[1]), c[2], (0, 255, 255), 3)
+        #     cv2.circle(temp, (c[0], c[1]), 1, (0, 0, 255), 3)
 
-    temp = image.copy()
-    for c in circles:
-        cv2.circle(temp, (c[0], c[1]), c[2], (0, 255, 255), 3)
-        cv2.circle(temp, (c[0], c[1]), 1, (0, 0, 255), 3)
+        first = None
+        second = None
+        for i in range(len(circles)):
+            for j in range(len(circles)):
+                if i == j:  # we want different circles
+                    continue
 
-    first = None
-    second = None
-    for i in range(len(circles)):
-        for j in range(len(circles)):
-            if i == j:  # we want different circles
-                continue
+                if abs(circles[i][1] - circles[j][1]) < 50:
+                    if circles[i][0] < circles[j][0]:
+                        first = circles[i]
+                        second = circles[j]
+                    else:
+                        first = circles[j]
+                        second = circles[i]
 
-            if abs(circles[i][1] - circles[j][1]) < 50:
-                if circles[i][0] < circles[j][0]:
-                    first = circles[i]
-                    second = circles[j]
-                else:
-                    first = circles[j]
-                    second = circles[i]
+                    break
 
-                break
+        if first is None or second is None:
+            continue
+        rotation_center = (first[0], first[1])
+        x_diff = second[0] - first[0]
+        y_diff = second[1] - first[1]
+        rotation_angle = math.atan2(y_diff, x_diff)
+        rotation_angle = math.degrees(rotation_angle)
+        rotation_matrix = cv2.getRotationMatrix2D(rotation_center, rotation_angle, 1)
 
-    rotation_center = (first[0], first[1])
-    x_diff = second[0] - first[0]
-    y_diff = second[1] - first[1]
-    rotation_angle = math.atan2(y_diff, x_diff)
-    rotation_angle = math.degrees(rotation_angle)
-    rotation_matrix = cv2.getRotationMatrix2D(rotation_center, rotation_angle, 1)
-
-    image = cv2.warpAffine(image, rotation_matrix, gray.T.shape)
-    return image
-
+        image = cv2.warpAffine(image, rotation_matrix, gray.T.shape)
+        return image
+    return None
 
 def crop_answer_section(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
