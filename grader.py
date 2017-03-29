@@ -118,6 +118,10 @@ def crop_answer_section(image):
         maxLoc[0] = maxLoc[0] + circle_with_cross_template.shape[1] // 2
         maxLoc[1] = maxLoc[1] + circle_with_cross_template.shape[0] // 2
         maxLoc = tuple(maxLoc)
+
+        # Don't pick points in the mid of the paper even if they have a match
+        if maxLoc[0] < image.shape[1] * 0.80 and maxLoc[0] > image.shape[1] * 0.2:
+            continue
         objects_matched.append(maxLoc)
     p1, p2 = sorted(objects_matched)
     image = image[p1[1]:p2[1], p1[0]:p2[0]]
