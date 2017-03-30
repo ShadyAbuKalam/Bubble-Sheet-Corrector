@@ -100,14 +100,16 @@ def optimize_image_rotation(image):
         return image
     return None
 
+
 def crop_answer_section(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     circle_with_cross_template = cv2.imread("circle.png")
     circle_with_cross_template = cv2.cvtColor(circle_with_cross_template, cv2.COLOR_BGR2GRAY)
     result = cv2.matchTemplate(gray, circle_with_cross_template, cv2.TM_CCORR_NORMED)
 
+    # Pick 4 matches, then take the one to the most left and the one to the most right
     objects_matched = []
-    while len(objects_matched) < 2:
+    while len(objects_matched) < 4:
 
         minV, maxV, minLoc, maxLoc = cv2.minMaxLoc(result)
 
@@ -119,11 +121,11 @@ def crop_answer_section(image):
         maxLoc[1] = maxLoc[1] + circle_with_cross_template.shape[0] // 2
         maxLoc = tuple(maxLoc)
 
-        # Don't pick points in the mid of the paper even if they have a match
-        if maxLoc[0] < image.shape[1] * 0.80 and maxLoc[0] > image.shape[1] * 0.2:
-            continue
         objects_matched.append(maxLoc)
-    p1, p2 = sorted(objects_matched)
+
+        objects_matched = sorted(objects_matched)
+        p1 = objects_matched[0]
+        p2 = objects_matched[-1]
     image = image[p1[1]:p2[1], p1[0]:p2[0]]
     return image
 
