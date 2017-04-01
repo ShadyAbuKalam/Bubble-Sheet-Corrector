@@ -46,6 +46,7 @@ fabric.properties
 
 *.zip
 test/
+train/
 test.png
 submission.csv
 .~*

@@ -55,7 +55,7 @@ def optimize_image_rotation(image):
     edged = cv2.Canny(blurred, 75, 150)
 
     # find circles in the edge map, then find two almost on the same line
-    dp_values = [2,3,4]
+    dp_values = [2, 3, 4]
     for dp in dp_values:
         circles = cv2.HoughCircles(edged, cv2.HOUGH_GRADIENT, dp, 700, minRadius=35, maxRadius=45)
         if circles is None:
@@ -140,23 +140,32 @@ def have_nearby_contours(contours, needle):
     return False
 
 
-def get_answers(image):
-    # display_normal("Just image",image)
+def find_question_contours(image, blur=False):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    if blur:
+        blurred_gray = cv2.GaussianBlur(gray, (3, 3), 1)
+        edged = cv2.Canny(blurred_gray, 75, 150)
+    else:
+        edged = cv2.Canny(gray, 75, 150)
+    # display_normal("Edge",edged)
 
-    # median_blurred = cv2.medianBlur(gray, 3)
-    equalized_img = cv2.equalizeHist(gray)
+    # todo : make it more generic to remove all lines
+    # remove annoying vertical lines longer than 15 pixels
+    linek = np.zeros((15, 11), dtype=np.uint8)
+    linek[..., 5] = 1
+    vlines = cv2.morphologyEx(edged, cv2.MORPH_OPEN, linek)
+    edged = edged - vlines
+    # display_normal("vLines",edged)
 
-    median = np.median(equalized_img)
-    ret, thresh = cv2.threshold(equalized_img, 0.2 * median, 255, cv2.CHAIN_APPROX_NONE)
+    # Dilate circles trying to complete them
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    edged = cv2.dilate(edged, kernel)
 
-    # display_normal("Binary", thresh)
     # find contours in the thresholded image, then initialize
     # the list of contours that correspond to questions
-    cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
+    cnts = cv2.findContours(edged, cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
     cnts = cnts[1]
-
     questionCnts = []
 
     # loop over the contours
@@ -165,7 +174,7 @@ def get_answers(image):
         # bounding box to derive the aspect ratio
         (x, y, w, h) = cv2.boundingRect(c)
         ar = w / float(h)
-        if y < 25 or y > image.shape[0] - 20:
+        if y > image.shape[0] - 20:
             continue
         if x < 10:
             continue
@@ -175,7 +184,7 @@ def get_answers(image):
             continue
         if len(c) < 5:
             continue
-        if w < 15 or h < 15:
+        if w < 20 or h < 20:
             continue
         if have_nearby_contours(questionCnts, c):
             continue
@@ -184,10 +193,24 @@ def get_answers(image):
         # should be sufficiently wide, sufficiently tall, and
         # have an aspect ratio approximately equal to 1
         questionCnts.append(c)
+    cv2.drawContours(image, questionCnts, -1, (255, 255, 0), 2)
+    # display_normal("With contours",image)
+    return questionCnts
+
+
+# todo: If we have less than 180 choice, then cluster them each related 4 together and neglect the remaining
+def get_answers(image):
+    questionCnts = find_question_contours(image.copy())
+    if len(questionCnts) != 45 * 4:
+        questionCnts = find_question_contours(image.copy(), True)
 
     if len(questionCnts) != 45 * 4:
-        raise Exception("Didn't found all possible answers")
+        raise Exception("Didn't found all possible answers, only found {0}".format(len(questionCnts)))
 
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    equalized_img = cv2.equalizeHist(gray)
+    median = np.median(equalized_img)
+    ret, thresh = cv2.threshold(equalized_img, 0.2 * median, 255, cv2.CHAIN_APPROX_NONE)
     answers = {}
     questionCnts, bounding_boxes = sort_contours(questionCnts, "top-to-bottom")
     # each question has 4 possible answers, to loop over the
@@ -227,7 +250,7 @@ def get_answers(image):
 failed_images = 0
 tried_files = 0
 grades = {}
-for f in pathlib.Path('train').iterdir():
+for f in pathlib.Path('test').iterdir():
     tried_files += 1
     try:
         image = cv2.imread(f.as_posix())
@@ -236,9 +259,9 @@ for f in pathlib.Path('train').iterdir():
         answers = get_answers(image)
         grade = mark(answers)
         grades[f.name] = grade
-    except:
+    except Exception as e:
         grades[f.name] = 0
-        print("File {0} failed".format(f.as_posix()))
+        print("File {0} failed with error message {1}".format(f.as_posix(), e))
         failed_images += 1
 
 with open('submission.csv', 'w') as csv_file:
