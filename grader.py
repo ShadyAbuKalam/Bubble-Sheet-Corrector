@@ -140,7 +140,7 @@ def have_nearby_contours(contours, needle):
     return False
 
 
-def find_question_contours(image, blur=False):
+def find_question_contours(image, blur=False,erode = False):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     if blur:
         blurred_gray = cv2.GaussianBlur(gray, (3, 3), 1)
@@ -166,8 +166,22 @@ def find_question_contours(image, blur=False):
     cnts = cv2.findContours(edged, cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
     cnts = cnts[1]
-    questionCnts = []
+    questionCnts = filter_contours(cnts, image)
+    if erode:
+        im_with_erode = edged.copy()
+        cv2.drawContours(im_with_erode, questionCnts, -1, (255, 255, 255), -1)
+        im_with_erode= cv2.morphologyEx(im_with_erode,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(15,15)))
+        im_with_erode = cv2.bitwise_and(im_with_erode,edged)
+        cnts = cv2.findContours(im_with_erode, cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_SIMPLE)
+        cnts = cnts[1]
+        questionCnts = filter_contours(cnts, image)
 
+    return questionCnts
+
+
+def filter_contours(cnts, image):
+    questionCnts = []
     # loop over the contours
     for c in cnts:
         # compute the bounding box of the contour, then use the
@@ -180,7 +194,7 @@ def find_question_contours(image, blur=False):
             continue
         if 200 <= x <= 345:
             continue
-        if 520 <= x <= 670:
+        if 500 <= x <= 670:
             continue
         if len(c) < 5:
             continue
@@ -193,8 +207,6 @@ def find_question_contours(image, blur=False):
         # should be sufficiently wide, sufficiently tall, and
         # have an aspect ratio approximately equal to 1
         questionCnts.append(c)
-    cv2.drawContours(image, questionCnts, -1, (255, 255, 0), 2)
-    # display_normal("With contours",image)
     return questionCnts
 
 
@@ -203,6 +215,9 @@ def get_answers(image):
     questionCnts = find_question_contours(image.copy())
     if len(questionCnts) != 45 * 4:
         questionCnts = find_question_contours(image.copy(), True)
+
+    if len(questionCnts) != 45 * 4:
+        questionCnts = find_question_contours(image.copy(), True,True)
 
     if len(questionCnts) != 45 * 4:
         raise Exception("Didn't found all possible answers, only found {0}".format(len(questionCnts)))
