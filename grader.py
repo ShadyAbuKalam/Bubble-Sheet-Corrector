@@ -208,9 +208,8 @@ def get_answers(image):
         raise Exception("Didn't found all possible answers, only found {0}".format(len(questionCnts)))
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    equalized_img = cv2.equalizeHist(gray)
-    median = np.median(equalized_img)
-    ret, thresh = cv2.threshold(equalized_img, 0.2 * median, 255, cv2.CHAIN_APPROX_NONE)
+
+    ret,thresh = cv2.threshold(gray,0,255,cv2.THRESH_BINARY_INV|cv2.THRESH_OTSU)
     answers = {}
     questionCnts, bounding_boxes = sort_contours(questionCnts, "top-to-bottom")
     # each question has 4 possible answers, to loop over the
@@ -223,26 +222,34 @@ def get_answers(image):
         for i in np.arange(0, 12, 4):
             question = q + (i // 4) * 15 + 1
             single_q_cnts = cnts[i:i + 4]
-            bubbled = None
+            ratios = []
             # loop over the sorted contours
             for (j, c) in enumerate(single_q_cnts):
                 # construct a mask that reveals only the current
                 # "bubble" for the question
                 mask = np.zeros(thresh.shape, dtype="uint8")
                 cv2.drawContours(mask, [c], -1, 255, -1)
-
                 # apply the mask to the thresholded image, then
                 # count the number of non-zero pixels in the
                 # bubble area
                 mask = cv2.bitwise_and(thresh, thresh, mask=mask)
-                total = cv2.countNonZero(mask)
-                # if the current total has a larger number of total
-                # non-zero pixels, then we are examining the currently
-                # bubbled-in answer
-                if bubbled is None or total > bubbled[0]:
-                    bubbled = (total, j + 1)
 
-            answers[question] = bubbled[1]
+                area = cv2.contourArea(c)
+                total = cv2.countNonZero(mask)
+                ratio = total / area
+
+                ratios.append(ratio)
+
+
+            r1,r2 = sorted(ratios,reverse=True)[0:2]
+            if (abs(r2-r1)) <0.25:
+
+                answers[question]=0
+            else:
+                answers[question] = ratios.index(max(ratios))+1
+
+
+
 
     return answers
 
@@ -258,6 +265,7 @@ for f in pathlib.Path('test').iterdir():
         image = crop_answer_section(image)
         answers = get_answers(image)
         grade = mark(answers)
+        print ("#{0} : {1}   :   {2}".format(tried_files,f.name,grade))
         grades[f.name] = grade
     except Exception as e:
         grades[f.name] = 0
@@ -270,4 +278,5 @@ with open('submission.csv', 'w') as csv_file:
 
     for key, value in grades.items():
         writer.writerow([key, value])
+
 print("failed to correct {0} files ".format(failed_images))
