@@ -26,7 +26,7 @@ This project is created as senior year image processing course for correcting a 
 1. Papers are scanned with almost correct orientation ( may be rotated less than 45 degrees).
 
 ---
-### Algorithm steps
+### Algorithm steps (1st Approach):
 
 1. Use hough circle transform to detect the two big black circles at the bottom, then fix the rotation.
 2. Use template matching to match the circles with cross inside it, then use them to crop the answers section.
@@ -39,3 +39,19 @@ This project is created as senior year image processing course for correcting a 
     6. Filter the contours according to specific parameters, to get only the choices contours.
 4. Sort the contours and cluster them 4 for each question.
 5. Find which contour is the most filled one and consider it as answer. (Note: the implementation must change to take into consideration a few special cases.)
+
+---
+### Algorithm steps (2nd Approach):
+
+1. Convert image to grayscale
+2. Use gaussian kernel to blur image and remove noise.
+3. Use hough circle transform to detect the two big black circles at the bottom, then fix the rotation.
+4. Use template matching to match the circles with cross inside it, then use them to crop the answers section.
+5. Use OTSU Thresholding on cropped section.
+6. Crop each question using question coordinated since they are always the same after the rotation and cropping steps.
+7. Foreach question in paper:
+    1. Closing.
+    2. Crop vertically to 4 equal parts.
+    3. Foreach answer in question get number of dark pixels
+    4. Get average darkness in question then calculate number of chocies that is above this average.
+    5. If only one choice is above average then this is the answer and check if it is right or wrong, but if more than one choice is            above average the question gets a zero.
